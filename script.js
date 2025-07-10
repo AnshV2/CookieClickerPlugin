@@ -1,4 +1,5 @@
 (function () {
+  let autoBuyActive = false;
 
   function findBestAffordableBuilding() {
     const buildings = Game.ObjectsById;
@@ -20,23 +21,49 @@
     return bestBuilding;
   }
 
+  function continueAutoBuy(price, building) {
+    const newPrice = building.getPrice();
+
+    if (newPrice !== price) {
+        toggleAutoBuy();
+    } else {
+        setTimeout(() => continueAutoBuy(price, building), 100);
+    }
+  }
+
   function toggleAutoBuy() {
     const building = findBestAffordableBuilding();
-    if (!building) return;
+    if (!building) {
+        autoBuyActive = false;
+      btn.disabled = false;
+      btn.innerHTML = `<span style="margin-right: 8px;">🍪</span>Start Auto Buy`;
+      return;
+    }
 
+    autoBuyActive = true;
+    btn.disabled = true;
+    btn.innerHTML = `<span style="margin-right: 8px;">🍪</span>Auto-buying...`;
+    btn.style.backgroundColor = "#888";
+    btn.style.cursor = "not-allowed";
+
+    const ogPrice = building.getPrice();
     building.buy(1);
-    setTimeout(toggleAutoBuy, 1000);
+    continueAutoBuy(ogPrice, building);
   }
 
   function monitorButtonAvailability() {
     setInterval(() => {
+      if (autoBuyActive) return;
+
       const bestBuilding = findBestAffordableBuilding();
       if (bestBuilding) {
-        btn.style.backgroundColor = "#28a745"; 
+        btn.style.backgroundColor = "#28a745";
         btn.style.cursor = "pointer";
+        btn.disabled = false;
       } else {
-        btn.style.backgroundColor = "#888"; 
+        btn.style.backgroundColor = "#888";
         btn.style.cursor = "not-allowed";
+        btn.disabled = true;
       }
     }, 500);
   }
@@ -63,18 +90,18 @@
   btn.style.transition = "background-color 0.2s ease";
 
   btn.onclick = toggleAutoBuy;
-
   document.body.appendChild(btn);
 
-  // CPS/Cost ratio display below cost, left-aligned, full width
+  // CPS/Cost ratio displayed inline next to cost using common exponent
   function injectRatioDisplay() {
     setInterval(() => {
       const buildings = Game.ObjectsById;
 
       let bestRatio = -Infinity;
       let bestId = -1;
+      let maxRatio = 0;
 
-      buildings.forEach((building) => {
+      const ratios = buildings.map((building) => {
         const cost = building.getPrice();
         const cps = building.storedCps;
         const ratio = cps / cost;
@@ -83,13 +110,21 @@
           bestRatio = ratio;
           bestId = building.id;
         }
+
+        if (ratio > maxRatio) {
+          maxRatio = ratio;
+        }
+
+        return {
+          id: building.id,
+          ratio,
+        };
       });
 
-      buildings.forEach((building) => {
-        const cost = building.getPrice();
-        const cps = building.storedCps;
-        const ratio = cps / cost;
-        const id = building.id;
+      const commonExponent = Math.floor(Math.log10(maxRatio));
+
+      ratios.forEach(({ id, ratio }) => {
+        const mantissa = ratio / Math.pow(10, commonExponent);
 
         const buildingEl = document.getElementById(`product${id}`);
         if (!buildingEl) return;
@@ -97,27 +132,18 @@
         const priceEl = buildingEl.querySelector(".price");
         if (!priceEl) return;
 
-        let ratioDiv = buildingEl.querySelector(".cps-ratio-div");
-        if (!ratioDiv) {
-          ratioDiv = document.createElement("div");
-          ratioDiv.className = "cps-ratio-div";
-
-          // Style for left alignment and full width
-          ratioDiv.style.fontSize = "10px";
-          ratioDiv.style.color = "#ccc";
-          ratioDiv.style.marginTop = "2px";
-          ratioDiv.style.textAlign = "left";
-          ratioDiv.style.whiteSpace = "nowrap";
-          ratioDiv.style.width = "100%";
-
-          // Insert after the price element (as sibling)
-          priceEl.insertAdjacentElement("afterend", ratioDiv);
+        let ratioSpan = priceEl.querySelector(".cps-ratio-span");
+        if (!ratioSpan) {
+          ratioSpan = document.createElement("span");
+          ratioSpan.className = "cps-ratio-span";
+          ratioSpan.style.fontSize = "10px";
+          ratioSpan.style.color = "#ccc";
+          ratioSpan.style.marginLeft = "6px";
+          priceEl.appendChild(ratioSpan);
         }
 
-        ratioDiv.textContent = `CPS/Cost: ${ratio.toFixed(6)}`;
-        ratioDiv.style.color = id === bestId ? "#00ff00" : "#ccc";
-
-        buildingEl.style.minHeight = "70px";
+        ratioSpan.textContent = `(${mantissa.toFixed(2)}e${commonExponent})`;
+        ratioSpan.style.color = id === bestId ? "#00ff00" : "#ccc";
       });
     }, 1000);
   }
