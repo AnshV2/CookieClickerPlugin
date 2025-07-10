@@ -17,7 +17,7 @@
       }
     });
 
-    if (!bestBuilding || Game.cookies < bestBuilding.getPrice()) return null;
+    if (Game.cookies < bestBuilding.getPrice()) return null;
     return bestBuilding;
   }
 
@@ -27,7 +27,7 @@
     if (newPrice !== price) {
         toggleAutoBuy();
     } else {
-        setTimeout(() => continueAutoBuy(price, building), 100);
+        setTimeout(() => continueAutoBuy(price, building), 500);
     }
   }
 
@@ -37,6 +37,8 @@
         autoBuyActive = false;
       btn.disabled = false;
       btn.innerHTML = `<span style="margin-right: 8px;">🍪</span>Start Auto Buy`;
+      btn.style.backgroundColor = "#28a745";
+        btn.style.cursor = "pointer";
       return;
     }
 
@@ -46,9 +48,8 @@
     btn.style.backgroundColor = "#888";
     btn.style.cursor = "not-allowed";
 
-    const ogPrice = building.getPrice();
     building.buy(1);
-    continueAutoBuy(ogPrice, building);
+    setTimeout(() => toggleAutoBuy(), 1000);
   }
 
   function monitorButtonAvailability() {
